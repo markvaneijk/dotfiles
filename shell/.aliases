@@ -1,0 +1,148 @@
+alias aliases="nano ~/.aliases"
+alias autoload="composer dump"
+alias brewery="brew upgrade && brew cleanup -s"
+alias build="npx vite build"
+alias composer="php /usr/local/bin/composer"
+alias chrome="/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome"
+alias dev="npm run dev"
+alias dir="pwd"
+alias dump="composer dump"
+alias finder="open -a 'Finder' ."
+alias flushdns="sudo killall -HUP mDNSResponder"
+alias forcepull="sudo git fetch --all && sudo git reset --hard origin/master"
+alias fresh="php artisan migrate:fresh --seed"
+alias gitlog="git log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit"
+alias horizon="php artisan horizon"
+alias hush="touch ~/.hushlogin"
+alias install="COMPOSER_MEMORY_LIMIT=-1 composer install --verbose"
+alias migrate="php artisan migrate"
+alias mysqlport="ln -nfs /tmp/mysql_3306.sock /tmp/mysql.sock"
+alias nah="git reset --hard && git clean -df"
+alias nukepm="rm -Rf ./node_modules/ package-lock.json && npm cache clear --force && npm install"
+alias php="valet php"
+alias pint="php ./vendor/bin/pint"
+alias please="sudo"
+alias prod="npm run prod"
+alias nukeprod="nukepm && prod"
+alias seed="php artisan db:seed"
+alias serve="artisan serve"
+alias tink="tinker"
+alias tinker="artisan tinker"
+alias update="COMPOSER_MEMORY_LIMIT=-1 composer update --verbose"
+alias updatedb="sudo /usr/libexec/locate.updatedb"
+alias vite="npx vite"
+alias watch="npm run watch"
+alias weather='curl -s wttr.in | sed -n "1,7p"'
+alias wip="git add . && git commit -m 'wip' && git push"
+
+artisan() {
+
+    DIR=`pwd`
+
+    if [ -f $DIR/artisan ]; then
+        php artisan "$@"
+    else
+        php vendor/bin/testbench "$@"
+    fi
+}
+
+deploy() {
+
+    MESSAGE="${1:=wip}"
+
+    git add .
+    git commit -am "$MESSAGE"
+    git push
+    git fetch --all
+}
+
+site() {
+
+    cd /var/www/"$1";
+}
+
+t() {
+
+    test "$@"
+}
+
+test() {
+
+    if [[ ! -f "vendor/bin/pest" ]]; then
+        
+        vendor/bin/phpunit "$@"
+
+    else
+
+        vendor/bin/pest "$@"
+        
+    fi
+}
+
+shush() {
+
+    "$@" >& /dev/null
+}
+
+slim() {
+
+    if [[ ! -f "composer.json" ]]; then
+        echo "composer.json not found"
+        exit 1
+    fi
+
+    cp composer.json composer.json.backup
+
+    BRANCH=$(cd /var/www/slim && git branch --show-current | sed 's!\/!\\/!')
+    DIR=$(basename `pwd`)
+
+    sed -i '' -e "s/APP_URL=.*/APP_URL=https:\/\/$DIR.test/g" /var/www/slim/.env
+    sed -i '' -e "s/APP_FOLDER=.*/APP_FOLDER=$DIR/g" /var/www/slim/.env
+
+    sed -i '' -e "s/\"vormkracht10\/slim\"\: \".*\"/\"vormkracht10\/slim\": \"dev-$BRANCH\"/g" composer.json
+    sed -i '' -e 's/\"type\"\: \"github\"/\"type\": \"path\"/g' composer.json
+    sed -i '' -e 's/\"url\"\: \"git@github.com:vormkracht10\/slim\"/\"url\"\: \"\/var\/www\/slim\"/g' composer.json
+    sed -i '' -e 's/\"reference\"\: \".*\"/\"options\": \{\"symlink\": true\}/g' composer.json
+
+    rm -Rf ./vendor
+    rm -Rf ./composer.lock
+    rm -Rf ./composer.json.bak
+
+    update
+
+    mv composer.json.backup composer.json
+
+    rm -Rf ./composer.lock
+}
+
+tp() {
+
+    [ ! -f .env ] && { echo "No .env file found."; exit 1; }
+
+    DB_HOST=$(grep DB_HOST .env | grep -v -e '^\s*#' | cut -d '=' -f 2-)
+    DB_PORT=$(grep DB_PORT .env | grep -v -e '^\s*#' | cut -d '=' -f 2-)
+    DB_DATABASE=$(grep DB_DATABASE .env | grep -v -e '^\s*#' | cut -d '=' -f 2-)
+    DB_USERNAME=$(grep DB_USERNAME .env | grep -v -e '^\s*#' | cut -d '=' -f 2-)
+    DB_PASSWORD=$(grep DB_PASSWORD .env | grep -v -e '^\s*#' | cut -d '=' -f 2-)
+
+    DB_URL="mysql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_DATABASE}"
+
+    echo "Opening ${DB_URL}"
+
+    open $DB_URL
+}
+
+upgrade() {
+ 
+    STASH1=$(git add . && git stash save "wip")
+    STASH2=$(cd /var/www/slim && git add . && git stash save "wip" && git checkout master && git pull origin master)
+    
+    update
+    
+    SLIM_VERSION=$(cd /var/www/slim && git describe --tags --abbrev=0)
+
+    git add .
+    git commit -am "Upgrade Slim to $SLIM_VERSION"
+    git push
+    git fetch --all
+}
